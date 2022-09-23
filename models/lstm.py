@@ -1,9 +1,10 @@
 import json
 import torch
-from torch import nn, optim
+from torch import nn, optim, index_select
 from torch.utils.data import Dataset, DataLoader
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-from utils import encode_label, encode_onehot
+from utils import encode_label, encode_onehot, collate_pad
 
 # Assign to GPU if there is one available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -40,20 +41,21 @@ class LSTMGenerator(nn.Module):
         )
         self.lin = nn.Linear(hidden_size, 26)
 
-    def forward(self, x, prev_states=None):
+    def forward(self, x, prev_states):
 
-        output, states = self.lstm(x, prev_states)
+        x, (state_h, state_c) = self.lstm(x, prev_states)
+        x, _ = pad_packed_sequence(x, batch_first=True, padding_value=-1)
         x = x.reshape(-1, self.hidden_size)
         output = self.lin(x)
 
-        return output, states
+        return output, (state_h, state_c)
 
 
 # Define our training function
 def train(dataset, model, batch_size, epochs, lr):
 
     model = model.to(device)
-    dataloader = DataLoader(dataset, batch_size=batch_size)
+    dataloader = DataLoader(dataset, batch_size=batch_size, collate_fn=collate_pad)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.CrossEntropyLoss()
 
@@ -61,31 +63,53 @@ def train(dataset, model, batch_size, epochs, lr):
 
         model.train()
         train_loss = 0
-        states = None
+        state_h = torch.zeros(model.num_layers, batch_size, model.hidden_size).to(device)
+        state_c = torch.zeros(model.num_layers, batch_size, model.hidden_size).to(device)
 
-        for batch_num, (encoded_x, encoded_y) in enumerate(dataloader):
+        for batch_num, (batch_x, batch_y) in enumerate(dataloader):
 
-            encoded_x.to(device)
-            encoded_y.to(device)
+            batch_x = batch_x.to(device)
+            batch_y = batch_y.to(device)
 
             optimizer.zero_grad()
-            pred_y, states = model(encoded_x, states)
-            loss = loss_fn(pred_y, encoded_y)
+            pred_y, (state_h, state_c) = model(batch_x, (state_h, state_c))
+            batch_y_flat = batch_y.flatten()
+            padded_indices = (batch_y_flat != -1).nonzero().flatten()
+            pred_y_nopads = index_select(pred_y, 0, padded_indices)
+            batch_y_flat_nopads = index_select(batch_y_flat, 0, padded_indices)
+            loss = loss_fn(pred_y_nopads, batch_y_flat_nopads)
+
+            state_h = state_h.detach()
+            state_c = state_c.detach()
 
             loss.backward()
             optimizer.step()
 
             train_loss += loss.item()
 
-            print({'epoch': epoch, 'batch': batch_num, 'loss': loss.item()})
+            print(device, {'epoch': epoch, 'batch': batch_num, 'loss': loss.item()})
             
 
-# uh
+# Train and export a model if the file is called directly
+def main():
 
-with open('../data/names_clean.json', 'r') as f:
-    names = json.load(f)
+    hidden_size = 128
+    lstm_layers = 2
+    batch_size = 128
+    epochs = 100
+    learning_rate = 0.01
 
-dataset = BrandNameDataset(names)
-model = LSTMGenerator(64, 1)
+    mname = f'lstm{lstm_layers}_hs{hidden_size}_bs{batch_size}_ep{epochs}'
 
-train(dataset, model, 128, 100, 0.01)
+    with open('data/names_clean.json', 'r') as f:
+        names = json.load(f)
+
+    dataset = BrandNameDataset(names)
+    model = LSTMGenerator(hidden_size, lstm_layers)
+
+    train(dataset, model, batch_size, epochs, learning_rate)
+    torch.save(model.state_dict(), f'models/trained/{mname}.pt')
+
+
+if __name__ == '__main__':
+    main()
