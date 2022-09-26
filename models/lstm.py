@@ -41,10 +41,11 @@ class LSTMGenerator(nn.Module):
         )
         self.lin = nn.Linear(hidden_size, 26)
 
-    def forward(self, x, prev_states):
+    def forward(self, x, prev_states, train=True):
 
         x, (state_h, state_c) = self.lstm(x, prev_states)
-        x, _ = pad_packed_sequence(x, batch_first=True, padding_value=-1)
+        if train:
+            x, _ = pad_packed_sequence(x, batch_first=True, padding_value=-1)
         x = x.reshape(-1, self.hidden_size)
         output = self.lin(x)
 
@@ -77,7 +78,7 @@ def train(dataset, model, batch_size, epochs, lr):
             padded_indices = (batch_y_flat != -1).nonzero().flatten()
             pred_y_nopads = index_select(pred_y, 0, padded_indices)
             batch_y_flat_nopads = index_select(batch_y_flat, 0, padded_indices)
-            loss = loss_fn(pred_y_nopads, batch_y_flat_nopads)
+            loss = loss_fn(pred_y_nopads[0:-1,:], batch_y_flat_nopads[1:])
 
             state_h = state_h.detach()
             state_c = state_c.detach()

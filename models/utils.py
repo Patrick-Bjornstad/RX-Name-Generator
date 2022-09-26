@@ -4,7 +4,8 @@ from torch import from_numpy
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
 
 alphabet = list(string.ascii_lowercase)
-label_dict = {letter: label for label, letter in enumerate(alphabet)}
+label_dict = {letter: index for index, letter in enumerate(alphabet)}
+letter_dict = {index: letter for index, letter in enumerate(alphabet)}
 
 def encode_char_onehot(char):
     index = label_dict[char]
