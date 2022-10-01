@@ -2,7 +2,7 @@ import torch
 from torch.nn.functional import softmax
 import numpy as np
 
-from utils import encode_onehot, alphabet, letter_dict
+from utils import encode_onehot, letter_dict
 from lstm import LSTMGenerator
 
 model = LSTMGenerator(128, 2)
@@ -20,7 +20,6 @@ def predict(model, seed, num_letters):
         x = encode_onehot(name).T
         x = torch.from_numpy(x).float()
         y, (state_h, state_c) = model(x, (state_h, state_c), train=False)
-        print(i, y)
         y_next = y[-1, :]
         probs_next = softmax(y_next, dim=0).detach().numpy()
         letter_ind = np.random.choice(26, p=probs_next)
@@ -29,4 +28,4 @@ def predict(model, seed, num_letters):
 
     return name
     
-print(predict(model, 'bya', 9))
+print(predict(model, 'cod', 10))
