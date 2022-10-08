@@ -3,8 +3,10 @@ import torch
 from torch import nn, optim, index_select
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from torch.nn.functional import softmax
+import numpy as np
 
-from utils import encode_label, encode_onehot, collate_pad
+from utils import encode_label, encode_onehot, collate_pad, letter_dict
 
 # Assign to GPU if there is one available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -50,6 +52,26 @@ class LSTMGenerator(nn.Module):
         output = self.lin(x)
 
         return output, (state_h, state_c)
+
+    def predict(self, seed, num_letters):
+        self.eval()
+
+        num_predict = num_letters - len(seed)
+        state_h = torch.zeros(self.num_layers, self.hidden_size)
+        state_c = torch.zeros(self.num_layers, self.hidden_size)
+
+        name = seed
+        for i in range(num_predict):
+            x = encode_onehot(name).T
+            x = torch.from_numpy(x).float()
+            y, (state_h, state_c) = self(x, (state_h, state_c), train=False)
+            y_next = y[-1, :]
+            probs_next = softmax(y_next, dim=0).detach().numpy()
+            letter_ind = np.random.choice(26, p=probs_next)
+            letter = letter_dict[letter_ind]
+            name += letter
+
+        return name
 
 
 # Define our training function
