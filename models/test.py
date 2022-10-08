@@ -28,4 +28,4 @@ def predict(model, seed, num_letters):
 
     return name
     
-print(predict(model, 'cod', 10))
+print(predict(model, 'lemon', 10))
