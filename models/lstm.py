@@ -5,8 +5,12 @@ from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torch.nn.functional import softmax
 import numpy as np
+import sys 
+import os
 
-from utils import encode_label, encode_onehot, collate_pad, letter_dict
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+from models.utils import encode_label, encode_onehot, collate_pad, letter_dict
 
 # Assign to GPU if there is one available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

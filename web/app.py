@@ -1,8 +1,14 @@
 from dash import Dash, dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
 import string
+from torch import load as torch_load
+import sys
+import os
 
-from layout import layout
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+from web.layout import layout
+from models.lstm import LSTMGenerator
 
 # App Definition
 
