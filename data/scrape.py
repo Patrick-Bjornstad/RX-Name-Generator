@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 
 def scrape_rxassist():
     '''
-    Function for scraping the list of all drug brand names from RxAssist.org
+    Scrape the list of all drug brand names from RxAssist.org
 
         Returns:
             brand_list (list): list of all drug brand names on the site table
@@ -33,7 +33,7 @@ def scrape_rxassist():
 
 def scrape_rxlist():
     '''
-    Function for scraping the drug brand names available from RxList.com
+    Scrape the drug brand names available from RxList.com
 
         Returns:
             brand_list (list): list of all drug brand names available throughout the site
@@ -70,9 +70,7 @@ def scrape_rxlist():
 
 
 def main():
-    '''
-    Main execution function. Saves lists of names from each site as JSON files.
-    '''
+    '''Main execution function: saves lists of names from each site as JSON files.'''
 
     # RxAssist.org
     list_rxassist = scrape_rxassist()

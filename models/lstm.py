@@ -2,88 +2,186 @@ import json
 import torch
 from torch import nn, optim, index_select
 from torch.utils.data import Dataset, DataLoader
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from torch.nn.utils.rnn import pad_packed_sequence
 from torch.nn.functional import softmax
 import numpy as np
 import sys 
 import os
 
+# Custom module imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from models.utils import encode_label, encode_onehot, collate_pad, LETTER_DICT
 
-from models.utils import encode_label, encode_onehot, collate_pad, letter_dict
-
-# Assign to GPU if there is one available
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# Global variables
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-# Define our dataset class
+# Define our dataset class containing encoded names
 class BrandNameDataset(Dataset):
+    '''
+    PyTorch dataset class for arrays of names.
+
+        Attributes:
+            names_array (list): list of all names to be used in the dataset
+
+        Methods:
+            __len__: get the length of the dataset
+            __getitem__: return one encoded (x,y) pair given an index
+    '''
 
     def __init__(self, names_array):
+        '''
+        Construct the object.
+
+            Parameters:
+                names_array (list): list of all names to be used in the dataset
+        '''
+
         self.names_array = names_array
         
     def __len__(self):
+        '''Return the length of the entire dataset.'''
+
         return len(self.names_array)
     
     def __getitem__(self, idx):
+        '''
+        Given a dataset item index, encode the name for use as input and as output and return the pair.
+        The input (x) utilizes one-hot encoding of letters and the output (y) uses a basic index of the alphabet.
+        The index of a letter corresponds to the letter's associated index in the one-hot vector.
+
+            Parameters:
+                idx (int): index of the item in the dataset to encode
+
+            Returns:
+                encoded_x (np.array): 2D array containing the name with each letter one-hot encoded
+                encoded_y (np.array): 1D array containing the name with each letter as an index
+        '''
+
         name = self.names_array[idx]
         encoded_x = encode_onehot(name)
         encoded_y = encode_label(name)
         return encoded_x, encoded_y
 
 
-# Define the model
 class LSTMGenerator(nn.Module):
+    '''
+    PyTorch model class for the overall LSTM implementation.
+
+        Attributes:
+            hidden_size (int): the number of features in the hidden state of the LSTM
+            num_layers (int): number of LSTM modules to stack
+            lstm (torch.nn.LSTM): PyTorch LSTM module
+            lin (torch.nn.Linear): PyTorch linear transformation module
+
+        Methods:
+            forward: required PyTorch method detailing the forward propagation
+            predict: generate a random name given a length and a seed phrase
+            predict_max: generate the most likely name given a length and seed phrase
+    '''
 
     def __init__(self, hidden_size, num_layers=1):
+        '''
+        Construct the object.
+
+            Parameters:
+                hidden_size (int): number of features in the hidden state of the LSTM
+                num_layers (int): number of LSTM modules to stack
+        '''
         super().__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.lstm = nn.LSTM(
             26,                     # each character will be a one hot encoded vector of length 26
-            self.hidden_size,       # num of features in the hidden state, main hyperparameter
-            self.num_layers,        # only use a single LSTM by default
+            self.hidden_size,
+            self.num_layers,
             batch_first=True
         )
         self.lin = nn.Linear(hidden_size, 26)
 
     def forward(self, x, prev_states, train=True):
+        '''
+        Forward propagation: generate an output given an input.
+        Defines the overall structure of the model using the PyTorch modules set as attributes.
 
+            Parameters:
+                x (torch.Tensor): current one-hot encoded input
+                prev_states (tuple): tensors of the prev iteration's LSTM states
+                train (bool): flag for if we are currently training
+
+            Returns:
+                output (torch.Tensor): output of the model, 26 logit scores for the probability of each letter
+                state_h (torch.Tensor): new hidden state of the LSTM model
+                state_c (torch.Tensor): new cell state of the LSTM model
+        '''
+
+        # Pass inputs into LSTM
         x, (state_h, state_c) = self.lstm(x, prev_states)
+
+        # If training we have variable length inputs so have to handle padding
         if train:
             x, _ = pad_packed_sequence(x, batch_first=True, padding_value=-1)
+
+        # Get letter logits for each letter
         x = x.reshape(-1, self.hidden_size)
         output = self.lin(x)
 
         return output, (state_h, state_c)
 
     def predict(self, seed, num_letters):
-        self.eval()
+        '''
+        Given a desired output length and a starting input substring generate a random name.
+        Selects each new letter randomly from the probabilities generated by the model.
 
+            Parameters:
+                seed (str): substring that the name should start with
+                num_letters (int): desired output length including seed
+            
+            Returns:
+                name (str): generated name
+        '''
+
+        # Prepare model for new prediction
+        self.eval()
         num_predict = num_letters - len(seed)
         state_h = torch.zeros(self.num_layers, self.hidden_size)
         state_c = torch.zeros(self.num_layers, self.hidden_size)
 
+        # Main prediction loop
         name = seed
         for i in range(num_predict):
             x = encode_onehot(name).T
             x = torch.from_numpy(x).float()
             y, (state_h, state_c) = self(x, (state_h, state_c), train=False)
             y_next = y[-1, :]
-            probs_next = softmax(y_next, dim=0).detach().numpy()
+            probs_next = softmax(y_next, dim=0).detach().numpy()    # convert logits to probabilities
             letter_ind = np.random.choice(26, p=probs_next)
-            letter = letter_dict[letter_ind]
+            letter = LETTER_DICT[letter_ind]
             name += letter
 
         return name
 
     def predict_max(self, seed, num_letters):
-        self.eval()
+        '''
+        Given a desired output length and a starting input substring generate the most likely name.
+        Selects each new letter to be the one with the highest probability estimated by the model.
 
+            Parameters:
+                seed (str): substring that the name should start with
+                num_letters (int): desired output length including seed
+            
+            Returns:
+                name (str): generated name
+                prob_total (float): probability of this name being generated
+        '''
+
+        # Prepare model for new prediction
+        self.eval()
         num_predict = num_letters - len(seed)
         state_h = torch.zeros(self.num_layers, self.hidden_size)
         state_c = torch.zeros(self.num_layers, self.hidden_size)
 
+        # Main prediction loop
         name = seed
         prob_total = 1
         for i in range(num_predict):
@@ -91,35 +189,49 @@ class LSTMGenerator(nn.Module):
             x = torch.from_numpy(x).float()
             y, (state_h, state_c) = self(x, (state_h, state_c), train=False)
             y_next = y[-1, :]
-            probs_next = softmax(y_next, dim=0).detach().numpy()
+            probs_next = softmax(y_next, dim=0).detach().numpy()    # convert logits to probabilities
             letter_ind = int(probs_next.argmax())
             prob = probs_next[letter_ind]
-            letter = letter_dict[letter_ind]
+            letter = LETTER_DICT[letter_ind]
             name += letter
             prob_total *= prob
 
         return name, prob_total
 
+
 # Define our training function
 def train(dataset, model, batch_size, epochs, lr):
+    '''
+    Train an instance of the LSTMGenerator model class defined above.
 
-    model = model.to(device)
+        Parameters:
+            dataset (BrandNameDataset): data to use for training
+            model (LSTMGenerator): model instance to train
+            batch_size (int): size of batches to use in training
+            epochs (int): number of training epochs to perform
+            lr (float): learning rate of the optimizer
+    '''
+
+    # Initialize model, data, optimizer, and loss function
+    model = model.to(DEVICE)
     dataloader = DataLoader(dataset, batch_size=batch_size, collate_fn=collate_pad)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.CrossEntropyLoss()
 
     for epoch in range(epochs):
 
+        # Set/reset state
         model.train()
         train_loss = 0
-        state_h = torch.zeros(model.num_layers, batch_size, model.hidden_size).to(device)
-        state_c = torch.zeros(model.num_layers, batch_size, model.hidden_size).to(device)
+        state_h = torch.zeros(model.num_layers, batch_size, model.hidden_size).to(DEVICE)
+        state_c = torch.zeros(model.num_layers, batch_size, model.hidden_size).to(DEVICE)
 
         for batch_num, (batch_x, batch_y) in enumerate(dataloader):
 
-            batch_x = batch_x.to(device)
-            batch_y = batch_y.to(device)
+            batch_x = batch_x.to(DEVICE)
+            batch_y = batch_y.to(DEVICE)
 
+            # Forward propagation and assessment of loss
             optimizer.zero_grad()
             pred_y, (state_h, state_c) = model(batch_x, (state_h, state_c))
             batch_y_flat = batch_y.flatten()
@@ -128,34 +240,40 @@ def train(dataset, model, batch_size, epochs, lr):
             batch_y_flat_nopads = index_select(batch_y_flat, 0, padded_indices)
             loss = loss_fn(pred_y_nopads[0:-1,:], batch_y_flat_nopads[1:])
 
+            # Detach from current graph for use later
             state_h = state_h.detach()
             state_c = state_c.detach()
 
+            # Apply the training step
             loss.backward()
             optimizer.step()
 
             train_loss += loss.item()
 
-            print(device, {'epoch': epoch, 'batch': batch_num, 'loss': loss.item()})
+            print(DEVICE, {'epoch': epoch, 'batch': batch_num, 'loss': loss.item()})
             
 
 # Train and export a model if the file is called directly
 def main():
+    '''Main execution function: if file is called directly, train and export a model.'''
 
-    hidden_size = 128
-    lstm_layers = 2
+    # Define model parameters/hyperparameters
+    hidden_size = 256
+    lstm_layers = 1
     batch_size = 128
     epochs = 100
     learning_rate = 0.01
 
+    # Name of file for saving
     mname = f'lstm{lstm_layers}_hs{hidden_size}_bs{batch_size}_ep{epochs}'
 
+    # Instantiate dataset and model
     with open('data/names_clean.json', 'r') as f:
         names = json.load(f)
-
     dataset = BrandNameDataset(names)
     model = LSTMGenerator(hidden_size, lstm_layers)
 
+    # Train and save the model
     train(dataset, model, batch_size, epochs, learning_rate)
     torch.save(model.state_dict(), f'models/trained/{mname}.pt')
 
