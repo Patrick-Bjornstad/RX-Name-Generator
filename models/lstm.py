@@ -77,6 +77,28 @@ class LSTMGenerator(nn.Module):
 
         return name
 
+    def predict_max(self, seed, num_letters):
+        self.eval()
+
+        num_predict = num_letters - len(seed)
+        state_h = torch.zeros(self.num_layers, self.hidden_size)
+        state_c = torch.zeros(self.num_layers, self.hidden_size)
+
+        name = seed
+        prob_total = 1
+        for i in range(num_predict):
+            x = encode_onehot(name).T
+            x = torch.from_numpy(x).float()
+            y, (state_h, state_c) = self(x, (state_h, state_c), train=False)
+            y_next = y[-1, :]
+            probs_next = softmax(y_next, dim=0).detach().numpy()
+            letter_ind = int(probs_next.argmax())
+            prob = probs_next[letter_ind]
+            letter = letter_dict[letter_ind]
+            name += letter
+            prob_total *= prob
+
+        return name, prob_total
 
 # Define our training function
 def train(dataset, model, batch_size, epochs, lr):
