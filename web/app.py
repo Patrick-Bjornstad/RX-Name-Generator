@@ -1,14 +1,17 @@
 import dash
 from dash import Dash, dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
-import string
+import plotly.graph_objects as go
 from torch import load as torch_load
+import numpy as np
+import string
 import sys
 import os
+from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from web.layout import layout
+from web.layout import layout, graph_layout_names, graph_layout_letters
 from models.lstm import LSTMGenerator
 
 
@@ -25,7 +28,7 @@ app = Dash(
     meta_tags=[
         {'name': 'viewport', 'content': 'width=device-width, initial-scale=1' }
     ],
-    assets_folder='static/',
+    assets_folder='static',
     title='RX Name Generator'
 )
 
@@ -37,10 +40,11 @@ app.layout = layout
 @app.callback(
     Output('personal-info-toast', 'is_open'),
     Input('personal-info-toggle', 'n_clicks'),
+    State('personal-info-toast', 'is_open'),
     prevent_initial_call=True
 )
-def open_personal_info(clicks):
-    return True
+def open_personal_info(clicks, curr_state):
+    return not curr_state
 
 @app.callback(
     [Output('inputs-alert', 'children'),
@@ -90,7 +94,8 @@ def check_inputs(length, seed, num_gen):
 
 @app.callback(
     [Output('results-storage', 'data'),
-     Output('name-index-select', 'max_value')],
+     Output('name-index-select', 'max_value'),
+     Output('generate-button', 'children')],
     Input('generate-button', 'n_clicks'),
     [State('name-length-select', 'value'),
      State('name-seed-input', 'value'),
@@ -98,13 +103,17 @@ def check_inputs(length, seed, num_gen):
     prevent_initial_call=True
 )
 def populate_results(clicks, length, seed, num_gen):
-    results = []
+    results = {'names': []}
     seed = seed.lower()
     length = int(length)
     for i in range(num_gen):
         name = model.predict(seed, length)
-        results.append(name)
-    return [results, num_gen]
+        results['names'].append(name)
+    likely_name, likely_prob = model.predict_max(seed, length)
+    results['likely_name'] = likely_name
+    results['likely_prob'] = likely_prob
+    results['used_seed'] = seed
+    return [results, num_gen, 'Generate']
 
 @app.callback(
     Output('name-index-select', 'active_page'),
@@ -128,6 +137,7 @@ def show_name(page, data):
         next_num = page + 1 if page + 1 <= 10 else 1
         return [f'{prev_num}.', f'{curr_num}.', f'{next_num}.']
     else:
+        data = data['names']
         curr_num = page
         prev_num = page - 1 if page - 1 != 0 else len(data)
         next_num = page + 1 if page + 1 <= len(data) else 1
@@ -135,16 +145,77 @@ def show_name(page, data):
         return [f'{prev_num}. {prev_word}', f'{curr_num}. {curr_word}', f'{next_num}. {next_word}']
 
 @app.callback(
-    Output('unique-info', 'children'),
+    [Output('unique-info', 'children'),
+     Output('likely-info', 'children')],
     Input('results-storage', 'data'),
     prevent_initial_call=True
 )
-def calculate_unique(data):
+def fill_info(data):
     if data:
-        unique_names = list(set(data))
+        unique_names = list(set(data['names']))
         count = len(unique_names)
-        prop = round(count / len(data) * 100, 1)
-        return f'This generation run produced {count} unique words (proportion of unique words: {prop}%)'
+        prop = round(count / len(data['names']) * 100, 1)
+        return [
+            f'This generation run produced {count} unique words (proportion of unique words: {prop}%)',
+            f'The theoretical most likely name for this combination of inputs is {data["likely_name"].capitalize()} (probability of being generated: {round(data["likely_prob"] * 100, 1)}%)'
+        ]
+    else:
+        raise dash.exceptions.PreventUpdate
+
+@app.callback(
+    Output('name-graph', 'figure'),
+    Input('results-storage', 'data'),
+    prevent_initial_call=True
+)
+def fill_name_graph(data):
+    if data:
+        names = data['names']
+        total = len(names)
+        name_freq = dict(Counter(names))
+        sorted_names = sorted(name_freq.items(), key=lambda x: x[1], reverse=True)
+        if len(sorted_names) > 10:
+            sorted_names = sorted_names[:10]
+        names_x = list(map(lambda x: x[0], sorted_names))
+        probs_y = list(map(lambda x: x[1]/total, sorted_names))
+
+        bar = go.Bar(
+            x=names_x, y=probs_y,
+            hovertemplate='<b>Name:</b> %{x}<br><b>Relative Freq:</b> %{y:.3f}<extra></extra>'
+        )
+        fig = go.Figure(
+            data=[bar],
+            layout=graph_layout_names
+        )
+
+        return fig
+    else:
+        raise dash.exceptions.PreventUpdate
+
+@app.callback(
+    Output('letter-graph', 'figure'),
+    Input('results-storage', 'data'),
+    prevent_initial_call=True
+)
+def fill_letter_graph(data):
+    if data:
+        names = data['names']
+        letters_trim = list(map(lambda x: list(x[len(data['used_seed']):]), names))
+        letters_flat = list(np.array(letters_trim).flatten())
+        total = len(letters_flat)
+        name_freq = dict(Counter(letters_flat))
+        letters_x = list(string.ascii_lowercase)
+        probs_y = [name_freq[letter]/total for letter in letters_flat]
+
+        bar = go.Bar(
+            x=letters_x, y=probs_y,
+            hovertemplate='<b>Letter:</b> %{x}<br><b>Relative Freq:</b> %{y:.3f}<extra></extra>'
+        )
+        fig = go.Figure(
+            data=[bar],
+            layout=graph_layout_letters
+        )
+
+        return fig
     else:
         raise dash.exceptions.PreventUpdate
 

@@ -1,7 +1,6 @@
-from turtle import width
-from unittest import result
 from dash import html, dcc
 import dash_bootstrap_components as dbc
+import plotly.graph_objects as go
 
 navbar = dbc.Navbar(
     dbc.Container(
@@ -9,7 +8,7 @@ navbar = dbc.Navbar(
             dbc.Row(
                 [
                     dbc.Col(html.Img(src='/static/images/logo_site.svg', height='60px')),
-                    dbc.Col(dbc.NavbarBrand('LSTM Prescription Drug Name Generator', class_name='h1 text-light ps-2 fs-3 fw-bolder')),
+                    dbc.Col(dbc.NavbarBrand('LSTM Prescription Brand Name Generator', class_name='h1 text-light ps-2 fs-3 fw-bolder')),
                 ],
                 align='center',
                 class_name='g-0'
@@ -63,6 +62,32 @@ personal_info = dbc.Toast(
 )
 
 results_storage = dcc.Store(id='results-storage', data=None)
+
+graph_layout_names = go.Layout(
+        margin=dict(l=50, r=50, t=80, b=50),
+        title='Distribution of Generated Names (Up to Top 10)',
+        xaxis=dict(title='Name'),
+        yaxis=dict(title='Prob'),
+        template='plotly_white'
+)
+
+graph_layout_letters = go.Layout(
+        margin=dict(l=50, r=50, t=80, b=50),
+        title='Distribution of Generated Letters (not incl. Seed)',
+        xaxis=dict(title='Letter'),
+        yaxis=dict(title='Prob'),
+        template='plotly_white'
+)
+
+graph_names_emptyfig = go.Figure(
+    data=[],
+    layout= graph_layout_names
+)
+
+graph_letters_emptyfig = go.Figure(
+    data=[],
+    layout= graph_layout_letters
+)
 
 body = dbc.Container(
     [
@@ -125,12 +150,12 @@ body = dbc.Container(
                     class_name='ps-3 pe-3'
                 ),
                 dbc.Col(
-                    dbc.Button(
+                    dcc.Loading(dbc.Button(
                         'Generate',
                         id='generate-button',
                         class_name='fs-4',
                         disabled=True
-                    ),
+                    )),
                     width='auto'
                 )
             ],
@@ -193,7 +218,8 @@ body = dbc.Container(
                                         ),
                                         dbc.ListGroupItem(
                                             'The theoretical most likely name for this combination of inputs is __________ (probability of being generated: __%)', 
-                                            class_name='fs-6'
+                                            class_name='fs-6',
+                                            id='likely-info'
                                         ),
                                         dbc.ListGroupItem(
                                             'The graphs below showcase the actual distribution of results for this run, from both the letter level and the name level:', 
@@ -208,6 +234,30 @@ body = dbc.Container(
                     ],
                     justify='center',
                     class_name='mt-3'
+                ),
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            [
+                                dbc.Tabs(
+                                    [
+                                        dbc.Tab(
+                                            dcc.Graph(id='name-graph', figure=graph_names_emptyfig),
+                                            label='Name Distribution',
+                                            tab_class_name='ms-auto'
+                                        ),
+                                        dbc.Tab(
+                                            dcc.Graph(id='letter-graph', figure=graph_letters_emptyfig),
+                                            label='Letter Distribution'
+                                        )
+                                    ]
+                                )
+                            ],
+                            width=8
+                        )
+                    ],
+                    justify='center',
+                    class_name='mt-3'
                 )
             ]
         )
@@ -216,11 +266,41 @@ body = dbc.Container(
     class_name='mt-5'
 )
 
+footer = html.Div(
+    [
+        dbc.Row(
+            [
+                dbc.Col(
+                    html.Img(src='/static/images/logo_web_dark.png', height='30px', className='me-2'),
+                    width='auto'
+                ),
+                dbc.Col(
+                    html.Div('Site Version: 1.0.0 | Last Update: 10/9/22'),
+                    width='auto'
+                )
+            ],
+            justify='center',
+            align='center',
+            class_name='g-0'
+        ),
+        html.Div('All web app and underlying model development by Patrick Bjornstad', className='text-center'),
+        html.Div(
+            [
+                'Questions or comments? ',
+                html.A('Contact', href='mailto:patchbjornstad@gmail.com')
+            ],
+            className='text-center'
+        )
+    ],
+    className='border-top pt-3 pb-3 mt-5'
+)
+
 layout = html.Div(
     [
         # Main content: navbar, body, footer
         navbar,
         body,
+        footer,
 
         # Extras - popups, hidden storage components, etc
         personal_info,
