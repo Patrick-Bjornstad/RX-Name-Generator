@@ -40,7 +40,7 @@ personal_info = dbc.Toast(
             [
                 dbc.Col(html.Img(src='/static/images/github.svg', height='40px'), width='auto'),
                 dbc.Col(html.A('Profile', href='https://github.com/Patrick-Bjornstad', className='fs-6'), width='auto'),
-                dbc.Col(html.A('Project Repository', href='', className='fs-6'), width='auto')
+                dbc.Col(html.A('Project Repository', href='https://github.com/Patrick-Bjornstad/RX-Name-Generator', className='fs-6'), width='auto')
             ],
             align='center',
             class_name='pb-3',
