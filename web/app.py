@@ -1,3 +1,4 @@
+import dash
 from dash import Dash, dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
 import string
@@ -9,6 +10,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from web.layout import layout
 from models.lstm import LSTMGenerator
+
+
+# Model Instantiation
+
+model = LSTMGenerator(128, 2)
+model.load_state_dict(torch_load('models/trained/lstm2_hs128_bs128_ep100.pt'))
+
 
 # App Definition
 
@@ -28,7 +36,7 @@ app.layout = layout
 
 @app.callback(
     Output('personal-info-toast', 'is_open'),
-    [Input('personal-info-toggle', 'n_clicks')],
+    Input('personal-info-toggle', 'n_clicks'),
     prevent_initial_call=True
 )
 def open_personal_info(clicks):
@@ -79,6 +87,67 @@ def check_inputs(length, seed, num_gen):
         disabled=True
 
     return [alert_text, color, disabled]
+
+@app.callback(
+    [Output('results-storage', 'data'),
+     Output('name-index-select', 'max_value')],
+    Input('generate-button', 'n_clicks'),
+    [State('name-length-select', 'value'),
+     State('name-seed-input', 'value'),
+     State('name-num-input', 'value')],
+    prevent_initial_call=True
+)
+def populate_results(clicks, length, seed, num_gen):
+    results = []
+    seed = seed.lower()
+    length = int(length)
+    for i in range(num_gen):
+        name = model.predict(seed, length)
+        results.append(name)
+    return [results, num_gen]
+
+@app.callback(
+    Output('name-index-select', 'active_page'),
+    Input('results-storage', 'data'),
+    prevent_initial_call=True
+)
+def reset_pagination(data):
+    return 1
+
+@app.callback(
+    [Output('name-viewer-1', 'children'),
+     Output('name-viewer-2', 'children'),
+     Output('name-viewer-3', 'children')],
+    Input('name-index-select', 'active_page'),
+    State('results-storage', 'data')
+)
+def show_name(page, data):
+    if not data:
+        curr_num = page
+        prev_num = page - 1 if page - 1 != 0 else 10
+        next_num = page + 1 if page + 1 <= 10 else 1
+        return [f'{prev_num}.', f'{curr_num}.', f'{next_num}.']
+    else:
+        curr_num = page
+        prev_num = page - 1 if page - 1 != 0 else len(data)
+        next_num = page + 1 if page + 1 <= len(data) else 1
+        prev_word, curr_word, next_word = data[page - 2], data[page - 1], data[page % (len(data))]
+        return [f'{prev_num}. {prev_word}', f'{curr_num}. {curr_word}', f'{next_num}. {next_word}']
+
+@app.callback(
+    Output('unique-info', 'children'),
+    Input('results-storage', 'data'),
+    prevent_initial_call=True
+)
+def calculate_unique(data):
+    if data:
+        unique_names = list(set(data))
+        count = len(unique_names)
+        prop = round(count / len(data) * 100, 1)
+        return f'This generation run produced {count} unique words (proportion of unique words: {prop}%)'
+    else:
+        raise dash.exceptions.PreventUpdate
+
 
 # Run the Server 
 

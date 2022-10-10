@@ -1,4 +1,5 @@
 from turtle import width
+from unittest import result
 from dash import html, dcc
 import dash_bootstrap_components as dbc
 
@@ -60,6 +61,8 @@ personal_info = dbc.Toast(
     icon='info',
     style={'position': 'fixed', 'top': 110, 'right': 10, 'background-color': 'rgba(255,255,255,1)'}
 )
+
+results_storage = dcc.Store(id='results-storage', data=None)
 
 body = dbc.Container(
     [
@@ -148,6 +151,66 @@ body = dbc.Container(
         html.Div(className='border border-bottom ms-5 me-5 mt-4'),
 
         # Results Section
+        html.Div(
+            [
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            [
+                                html.Div(
+                                    '10.',
+                                    id='name-viewer-1',
+                                    className='h1 fs-3 text-center text-muted'
+                                ),
+                                html.Div(
+                                    '1.',
+                                    id='name-viewer-2',
+                                    className='h1 fs-1 text-center'
+                                ),
+                                html.Div(
+                                    '2.',
+                                    id='name-viewer-3',
+                                    className='h1 fs-3 text-center mb-3 text-muted'
+                                ),
+                                dbc.Pagination(
+                                    id='name-index-select',
+                                    max_value=10,
+                                    fully_expanded=False,
+                                    first_last=True,
+                                    previous_next=True,
+                                )
+                            ], 
+                            width='auto'
+                        ),
+                        dbc.Col(
+                            [
+                                dbc.ListGroup(
+                                    [
+                                        dbc.ListGroupItem(
+                                            'This generation run produced __ unique names (proportion of unique names: __%)', 
+                                            class_name='fs-6',
+                                            id='unique-info'
+                                        ),
+                                        dbc.ListGroupItem(
+                                            'The theoretical most likely name for this combination of inputs is __________ (probability of being generated: __%)', 
+                                            class_name='fs-6'
+                                        ),
+                                        dbc.ListGroupItem(
+                                            'The graphs below showcase the actual distribution of results for this run, from both the letter level and the name level:', 
+                                            class_name='fs-6'
+                                        )
+                                    ],
+                                    flush=True
+                                )
+                            ],
+                            width=5
+                        )
+                    ],
+                    justify='center',
+                    class_name='mt-3'
+                )
+            ]
+        )
     ],
     fluid=True,
     class_name='mt-5'
@@ -160,6 +223,7 @@ layout = html.Div(
         body,
 
         # Extras - popups, hidden storage components, etc
-        personal_info
+        personal_info,
+        results_storage
     ]
 )
