@@ -31,9 +31,6 @@ app = Dash(
 app.layout = layout
 
 
-# App callback functions
-
-
 @app.callback(
     Output('personal-info-toast', 'is_open'),
     Input('personal-info-toggle', 'n_clicks'),

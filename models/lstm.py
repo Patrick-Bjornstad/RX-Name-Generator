@@ -16,7 +16,6 @@ from models.utils import encode_label, encode_onehot, collate_pad, LETTER_DICT
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-# Define our dataset class containing encoded names
 class BrandNameDataset(Dataset):
     '''
     PyTorch dataset class for arrays of names.
