@@ -2,6 +2,7 @@ from dash import html, dcc
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 
+# Site navbar/header with tool title and personal logo
 navbar = dbc.Navbar(
     dbc.Container(
         [
@@ -34,6 +35,7 @@ navbar = dbc.Navbar(
     style={'height': '100px'}
 )
 
+# Pop up containing professional links
 personal_info = dbc.Toast(
     [
         dbc.Row(
@@ -61,8 +63,10 @@ personal_info = dbc.Toast(
     style={'position': 'fixed', 'top': 110, 'right': 10, 'background-color': 'rgba(255,255,255,1)'}
 )
 
+# Dash module for storing model results
 results_storage = dcc.Store(id='results-storage', data=None)
 
+# Define basic graph structure for charts to be generated
 graph_layout_names = go.Layout(
         margin=dict(l=50, r=50, t=80, b=50),
         title='Distribution of Generated Names (Up to Top 10)',
@@ -89,6 +93,7 @@ graph_letters_emptyfig = go.Figure(
     layout= graph_layout_letters
 )
 
+# Main site content
 body = dbc.Container(
     [
 
@@ -180,6 +185,8 @@ body = dbc.Container(
             [
                 dbc.Row(
                     [
+
+                        # Name viewer and pagination
                         dbc.Col(
                             [
                                 html.Div(
@@ -207,6 +214,8 @@ body = dbc.Container(
                             ], 
                             width='auto'
                         ),
+
+                        # Supplementary model result text
                         dbc.Col(
                             [
                                 dbc.ListGroup(
@@ -235,6 +244,8 @@ body = dbc.Container(
                     justify='center',
                     class_name='mt-3'
                 ),
+
+                # Graph section
                 dbc.Row(
                     [
                         dbc.Col(
@@ -266,6 +277,7 @@ body = dbc.Container(
     class_name='mt-5'
 )
 
+# Site footer with contact link and version details
 footer = html.Div(
     [
         dbc.Row(
@@ -275,7 +287,7 @@ footer = html.Div(
                     width='auto'
                 ),
                 dbc.Col(
-                    html.Div('Site Version: 1.0.0 | Last Update: 10/9/22'),
+                    html.Div('Site Version: 1.0.0 | Last Update: 10/10/22'),
                     width='auto'
                 )
             ],
@@ -295,6 +307,7 @@ footer = html.Div(
     className='border-top pt-3 pb-3 mt-5'
 )
 
+# Combine above components into overall app layout
 layout = html.Div(
     [
         # Main content: navbar, body, footer
