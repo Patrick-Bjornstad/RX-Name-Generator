@@ -1,4 +1,3 @@
-import json
 import torch
 from torch import nn, optim, index_select
 from torch.utils.data import Dataset, DataLoader
@@ -7,6 +6,7 @@ from torch.nn.functional import softmax
 import numpy as np
 import sys 
 import os
+import json
 
 # Custom module imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
