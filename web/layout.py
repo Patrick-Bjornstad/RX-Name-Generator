@@ -122,23 +122,7 @@ body = dbc.Container(
                 ),
                 dbc.Col(
                     html.Div(
-                        'prescription drug brand names of', 
-                        className='fs-2',
-                    ), 
-                    width='auto'
-                ),
-                dbc.Col(
-                    dbc.Select(
-                        id='name-length-select',
-                        options=[{'label': i, 'value': i} for i in range(4, 17)],
-                        class_name='fs-5'
-                    ),
-                    width='auto',
-                    class_name='ps-3 pe-3'
-                ),
-                dbc.Col(
-                    html.Div(
-                        'letters that start with', 
+                        'prescription drug brand names that start with', 
                         className='fs-2',
                     ), 
                     width='auto'
@@ -171,7 +155,6 @@ body = dbc.Container(
 
         # Input Alerts Section
         dbc.Alert(
-            'bitchesss',
             id='inputs-alert',
             color='warning',
             class_name='w-50 ms-auto me-auto mt-3'

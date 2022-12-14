@@ -6,22 +6,24 @@ from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
 # Global variables
 ALPHABET = list(string.ascii_lowercase)
 LABEL_DICT = {letter: index for index, letter in enumerate(ALPHABET)}
+LABEL_DICT[' '] = 26
 LETTER_DICT = {index: letter for index, letter in enumerate(ALPHABET)}
+LETTER_DICT[26] = ' '
 
 
 def encode_char_onehot(char):
     '''
-    Encodes a single character using one-hot encoding.
+    Encodes a single character/space using one-hot encoding.
 
         Parameters:
-            char (str): single letter to encode
+            char (str): single character to encode
 
         Returns:
             encoded (np.array): 1D array representing the one hot encoded vector
     '''
 
     index = LABEL_DICT[char]
-    encoded = np.eye(1, 26, index)[0]
+    encoded = np.eye(1, 27, index)[0]
     return encoded
 
 
