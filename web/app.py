@@ -17,7 +17,7 @@ from models.lstm import LSTMGenerator
 
 # Model instantiation
 model = LSTMGenerator(128, 2)
-model.load_state_dict(torch_load('models/trained/lstm2_hs128_bs128_ep100.pt'))
+model.load_state_dict(torch_load('models/trained/lstm2_hs128_bs128_ep100_sw0-05.pt'))
 
 # App definition
 app = Dash(
@@ -57,16 +57,14 @@ def open_personal_info(clicks, curr_state):
     [Output('inputs-alert', 'children'),
      Output('inputs-alert', 'color'),
      Output('generate-button', 'disabled')],
-    [Input('name-length-select', 'value'),
-     Input('name-seed-input', 'value'),
+    [Input('name-seed-input', 'value'),
      Input('name-num-input', 'value')]
 )
-def check_inputs(length, seed, num_gen):
+def check_inputs(seed, num_gen):
     '''
     Assess the supplied inputs to provide help text and disable/enable the generation button.
 
         Parameters:
-            length (str): user supplied input for the length of the name to generate
             seed (str): user supplied input for the seed string for the generator
             num_gen (int): user supplied input for number of names to generate
 
@@ -78,30 +76,18 @@ def check_inputs(length, seed, num_gen):
 
     allowed_letters = set(string.ascii_letters)
     if num_gen:
-        if seed and length:
+        if seed:
             seed_chars = set(seed)
             if not seed_chars.difference(allowed_letters):
-                length = int(length)
-                seed_len = len(seed)
-                warning_len = math.ceil(length / 2)
-                if seed_len >= length:
-                    alert_text = 'Your seed length is longer than the requested name length! Try a shorter seed or a longer name...'
-                    color = 'danger'
-                    disabled = True
-                elif seed_len >= warning_len:
-                    alert_text = f'Your seed length is fairly long compared to the requested name length! Only {length - seed_len} characters will be generated.'
-                    color = 'warning'
-                    disabled = False
-                else:
-                    alert_text = 'Press the generate button to produce results!'
-                    color = 'success'
-                    disabled = False
+                alert_text = 'Press the generate button to produce results!'
+                color = 'success'
+                disabled = False
             else:
                 alert_text = 'Invalid characters present in the seed. Only upper or lowercase English letters are allowed!'
                 color = 'danger'
                 disabled = True
         else:
-            alert_text = 'Input how many names to generate, the desired name length, and a seed string to get started...'
+            alert_text = 'Input how many names to generate and a seed string to get started...'
             color = 'warning'
             disabled = True
     else:
@@ -117,18 +103,16 @@ def check_inputs(length, seed, num_gen):
      Output('name-index-select', 'max_value'),
      Output('generate-button', 'children')],
     Input('generate-button', 'n_clicks'),
-    [State('name-length-select', 'value'),
-     State('name-seed-input', 'value'),
+    [State('name-seed-input', 'value'),
      State('name-num-input', 'value')],
     prevent_initial_call=True
 )
-def populate_results(clicks, length, seed, num_gen):
+def populate_results(clicks, seed, num_gen):
     '''
     Generate names using user input and store them in a Dash storage component for use by other callbacks.
 
         Parameters:
             clicks (int): number of clicks of the generate button, only used to trigger callback
-            length (str): user supplied input for length of name to generate
             seed (str): user supplied input for seed string given to generator
             num_gen (int): user supplied input for number of names to generate
 
@@ -140,11 +124,10 @@ def populate_results(clicks, length, seed, num_gen):
 
     results = {'names': []}
     seed = seed.lower()
-    length = int(length)
     for i in range(num_gen):
-        name = model.predict(seed, length)
+        name = model.predict(seed)
         results['names'].append(name)
-    likely_name, likely_prob = model.predict_max(seed, length)
+    likely_name, likely_prob = model.predict_max(seed)
     results['likely_name'] = likely_name
     results['likely_prob'] = likely_prob
     results['used_seed'] = seed
@@ -296,7 +279,8 @@ def fill_letter_graph(data):
     if data:
         names = data['names']
         letters_trim = list(map(lambda x: list(x[len(data['used_seed']):]), names))
-        letters_flat = list(np.array(letters_trim).flatten())
+        letters_flat = [item for sublist in letters_trim for item in sublist]
+        print(letters_flat)
         total = len(letters_flat)
         name_freq = dict(Counter(letters_flat))
         letters_x = list(string.ascii_lowercase)
