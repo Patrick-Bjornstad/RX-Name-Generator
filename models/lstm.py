@@ -12,8 +12,8 @@ import json
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from models.utils import encode_label, encode_onehot, collate_pad, LETTER_DICT
 
-# Global variables
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# Identify device
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 class BrandNameDataset(Dataset):
@@ -222,10 +222,10 @@ def train(dataset, model, batch_size, epochs, lr, space_weight=1):
     '''
 
     # Initialize model, data, optimizer, and loss function
-    model = model.to(DEVICE)
+    model = model.to(device)
     dataloader = DataLoader(dataset, batch_size=batch_size, collate_fn=collate_pad)
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    weights = torch.ones(27).to(DEVICE)
+    weights = torch.ones(27).to(device)
     weights[26] = space_weight
     loss_fn = nn.CrossEntropyLoss(weight=weights)
 
@@ -235,13 +235,13 @@ def train(dataset, model, batch_size, epochs, lr, space_weight=1):
         model.train()
         train_loss = 0
         train_counter = 0
-        state_h = torch.zeros(model.num_layers, batch_size, model.hidden_size).to(DEVICE)
-        state_c = torch.zeros(model.num_layers, batch_size, model.hidden_size).to(DEVICE)
+        state_h = torch.zeros(model.num_layers, batch_size, model.hidden_size).to(device)
+        state_c = torch.zeros(model.num_layers, batch_size, model.hidden_size).to(device)
 
         for batch_num, (batch_x, batch_y) in enumerate(dataloader):
 
-            batch_x = batch_x.to(DEVICE)
-            batch_y = batch_y.to(DEVICE)
+            batch_x = batch_x.to(device)
+            batch_y = batch_y.to(device)
 
             # Forward propagation and assessment of loss
             optimizer.zero_grad()
@@ -264,7 +264,7 @@ def train(dataset, model, batch_size, epochs, lr, space_weight=1):
             train_counter += 1
 
         avg_loss = train_loss/train_counter
-        print(DEVICE, {'epoch': epoch, 'avg_loss': avg_loss})
+        print(device, {'epoch': epoch, 'avg_loss': avg_loss})
             
 
 # Train and export a model if the file is called directly

@@ -1,14 +1,12 @@
 import dash
-from dash import Dash, dcc, html, Input, Output, State
+from dash import Dash, Input, Output, State
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
-from torch import load as torch_load
-import numpy as np
+import torch
 import string
 import sys
 import os
 from collections import Counter
-import math
 
 # Custom module imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -16,8 +14,14 @@ from web.layout import layout, graph_layout_names, graph_layout_letters
 from models.lstm import LSTMGenerator
 
 # Model instantiation
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = LSTMGenerator(128, 2)
-model.load_state_dict(torch_load('models/trained/lstm2_hs128_bs128_ep100_sw0-05.pt'))
+model.load_state_dict(
+    torch.load(
+        'models/trained/lstm2_hs128_bs128_ep100_sw0-05.pt',
+        map_location=device
+    )
+)
 
 # App definition
 app = Dash(
@@ -280,7 +284,6 @@ def fill_letter_graph(data):
         names = data['names']
         letters_trim = list(map(lambda x: list(x[len(data['used_seed']):]), names))
         letters_flat = [item for sublist in letters_trim for item in sublist]
-        print(letters_flat)
         total = len(letters_flat)
         name_freq = dict(Counter(letters_flat))
         letters_x = list(string.ascii_lowercase)
